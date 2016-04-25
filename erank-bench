@@ -1,0 +1,61 @@
+#! /usr/bin/env escript
+%% This line tells emacs to use -*- erlang -*- 
+%%! -pa _build/default/lib/erank/ebin/ 
+
+-mode(compile).
+%-compile(export_all).
+-export([main/1]).
+
+-define(TABLE, test).
+-define(RANK_P, test_p).
+-define(SIZE, 200000).
+-define(MAX_SIZE, 100000).
+
+-include_lib("erank/include/erank.hrl").
+
+
+main(_Args) ->   
+    mnesia:start(),
+    mnesia:create_table(?TABLE, [{type, ordered_set},
+                                 {record_name, rank}, 
+                                 {attributes, record_info(fields, rank)},
+                                 {index, [#rank.id]}]),
+    mod_rank:start_link(?RANK_P, ?TABLE, ?MAX_SIZE),
+    time_action("init table", 1, fun() ->
+                                         do_init_table(0),
+                                         mod_rank:wait(?RANK_P)
+                                 end),
+    time_action("query_top_100", 1000, fun() ->
+                                               query_top_100()
+                                       end),
+    time_action("query_my_rank", 100, fun() ->
+                                              query_my_rank(random:uniform(?SIZE))
+                                      end),
+    ok.
+    
+
+do_init_table(?SIZE) ->
+    ok;
+do_init_table(N) ->
+    mod_rank:insert(?RANK_P, N, N, []),
+    do_init_table(N + 1).
+
+query_top_100() ->
+    lib_rank:top(?TABLE, 100).
+
+query_my_rank(Id) ->
+    lib_rank:rank(?TABLE, Id).
+
+time_action(Description, NumIterations, Action) ->
+    garbage_collect(),
+    T0 = os:timestamp(),
+    iterate_action(NumIterations, Action),
+    T1 = os:timestamp(),
+    Elapsed = timer:now_diff(T1, T0) / 1000000,
+    io:format("~s ~w iterations, Elapsed ~ws ~n", [Description, NumIterations, Elapsed]).
+
+iterate_action(N, Action) when N > 0 ->
+    Action(),
+    iterate_action(N-1, Action);
+iterate_action(0, _Action) ->
+    ok.
