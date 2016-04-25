@@ -1,7 +1,7 @@
 erank
 =====
 
-Erlang基于Mnesia的orderd_set的排行榜实现
+基于Erlang Mnesia的orderd_set的排行榜实现
 
 Build
 -----
